@@ -83,7 +83,20 @@
         .tab-btn.active { background: var(--bg-surface); color: var(--primary); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
 
         .quiz-progress-outer { height: 8px; background: rgba(255, 255, 255, 0.05); border-radius: 10px; flex-grow: 1; margin: 0 20px; overflow: hidden; }
-        .quiz-progress-inner { height: 100%; background: var(--primary); width: 0%; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        .quiz-progress-inner { 
+    height: 100%; 
+    background: linear-gradient(90deg, #38bdf8, #818cf8, #38bdf8);
+    background-size: 200% auto;
+    width: 0%; 
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: shine 3s linear infinite;
+}
+
+@keyframes shine {
+    to { background-position: 200% center; }
+}
         /* Tìm và dán đè đoạn này vào CSS của bạn */
 /* 1. Cỡ chữ câu hỏi: nhỏ lại và cho phép xuống dòng */
 .question-text {
@@ -121,11 +134,59 @@
     padding: 0;
 }
         .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .option-card { padding: 30px; border-radius: 24px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); color: white; font-size: 1.2rem; font-weight: 600; cursor: pointer; text-align: center; }
+        .option-card { 
+    padding: 25px; 
+    border-radius: 20px; 
+    background: rgba(255, 255, 255, 0.03); 
+    border: 1px solid rgba(255, 255, 255, 0.1); 
+    border-bottom: 5px solid rgba(0, 0, 0, 0.3);
+    color: white; 
+    font-size: 1.1rem; 
+    font-weight: 600; 
+    cursor: pointer; 
+    position: relative;
+    text-align: center;
+}
+
+.option-card:hover:not(:disabled) { 
+    background: rgba(255, 255, 255, 0.08); 
+    transform: translateY(-2px);
+}
+
+.option-card:active:not(:disabled) {
+    transform: translateY(2px);
+    border-bottom-width: 1px;
+}
         .option-card:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); }
         .correct { background: var(--secondary) !important; border-color: transparent !important; box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); }
         .wrong { background: var(--wrong) !important; border-color: transparent !important; box-shadow: 0 0 20px rgba(244, 63, 94, 0.4); }
-    </style>
+/* Hiệu ứng cho đáp án hiện bên dưới khi sai */
+.hint-text {
+    margin-top: 15px;
+    font-size: 1.1rem;
+    color: #f43f5e; /* Màu đỏ của biến --wrong */
+    font-weight: 600;
+    animation: fadeIn 0.3s ease;
+    text-align: center;
+}
+
+/* Hiệu ứng rung nhẹ khi nhập sai */
+.shake {
+    animation: shake 0.4s ease-in-out;
+    border-bottom: 3px solid #f43f5e !important;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}    
+</style>
 </head>
 <body>
 
@@ -195,14 +256,14 @@
                 <div id="q-text" class="question-text"></div>
                 <div id="q-options" class="options-grid"></div>
 <div id="q-type-area" style="display:none; max-width:500px; margin: 0 auto;">
-    <input type="text" id="type-in" style="font-size:2.5rem; text-align:center; border:none; border-bottom:3px solid var(--primary); background:transparent; border-radius:0; margin-bottom: 30px !important;" placeholder="..." autocomplete="off">
+    <input type="text" id="type-in" style="font-size:2.5rem; ..." placeholder="..." autocomplete="off" onkeypress="if(event.key==='Enter') checkTypeAnswer()">
     <button class="btn-base btn-primary" style="width:100%; margin-top:30px; justify-content:center;" onclick="checkTypeAnswer()">KIỂM TRA</button>
 </div>
                 <button id="next-btn" class="btn-base btn-primary" style="display:none; width:100%; margin-top:40px; justify-content:center; background:white; color:black;" onclick="nextStep()">TIẾP THEO ➜</button>
             </div>
         </div>
     <script>
-        // CẤU HÌNH FIREBASE
+        // CẤU HÌNH FIREBASE (Giữ nguyên config của bạn)
         const firebaseConfig = {
             apiKey: "AIzaSyALi34WevE0G9d5FxlMDi13kVdQ7RxYJV8",
             authDomain: "myvocabapp-650b2.firebaseapp.com",
@@ -218,9 +279,23 @@
         const database = firebase.database();
         const vocabRef = database.ref('vocab_data');
 
+        // BIẾN TOÀN CỤC
         let db = [];
-        let session = { study: [], correct: null, idx: 0, mode: 'bulk', editIndex: null };
+        let session = { study: [], correct: null, idx: 0, currentFolderName: "" };
+        let correctPool = []; // Chứa từ đúng trắc nghiệm để đợi ôn tập tự luận
 
+        // 1. Hàm phát âm (Chỉ dùng cho Trắc nghiệm/Từ điển)
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const msg = new SpeechSynthesisUtterance(text);
+                msg.lang = 'en-US';
+                msg.rate = 0.9;
+                window.speechSynthesis.speak(msg);
+            }
+        }
+
+        // 2. Hàm trộn mảng
         function shuffle(array) {
             let arr = [...array];
             for (let i = arr.length - 1; i > 0; i--) {
@@ -230,6 +305,23 @@
             return arr;
         }
 
+        // 3. Hàm lưu tiến trình lên Firebase
+        function saveUserProgress() {
+            if (session.currentFolderName) {
+                database.ref('user_progress/' + session.currentFolderName).set({
+                    lastIndex: session.idx
+                });
+            }
+        }
+
+        // 4. Hàm tải tiến trình từ Firebase
+        async function loadUserProgress(folderName) {
+            try {
+                const snapshot = await database.ref('user_progress/' + folderName).once('value');
+                const data = snapshot.val();
+                return data ? data.lastIndex : 0;
+            } catch (e) { return 0; }
+        }
         function switchPage(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
@@ -298,13 +390,19 @@ res.innerHTML = `
         const realIndex = db.indexOf(group); 
         const card = document.createElement('div');
         card.className = 'glass-card folder-item';
-        card.onclick = () => { 
-    session.study = shuffle(group.words); 
-    session.idx = 0; // Đảm bảo luôn bắt đầu từ câu số 0
-    session.currentFolderName = group.name; 
-    switchPage('page-quiz'); 
-    nextStep(); 
-};
+        card.onclick = async () => { 
+            session.study = [...group.words]; // Copy danh sách từ
+            session.currentFolderName = group.name;
+            
+            // Tải vị trí câu hỏi cũ
+            const savedIdx = await loadUserProgress(group.name);
+            
+            // Nếu đã học xong thì bắt đầu lại từ đầu, nếu chưa thì học tiếp
+            session.idx = (savedIdx < session.study.length) ? savedIdx : 0;
+            
+            switchPage('page-quiz'); 
+            nextStep(); 
+        };
         // Tìm trong hàm renderDashboard và thay thế đoạn tạo nội dung card:
 card.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -405,69 +503,60 @@ function saveCollection() {
         }
 
         
+// 1. Hàm chuyển câu hỏi (Xử lý logic ôn tập)
 function nextStep() {
-    // 1. Kiểm tra nếu đã hết từ để học
     if(session.idx >= session.study.length) {
-        alert("Chúc mừng! Bạn đã hoàn thành bộ từ này.");
+        alert("Chúc mừng! Bạn đã hoàn thành bài học.");
         return switchPage('page-home');
     }
 
-    // 2. Cập nhật thanh tiến trình (Progress Bar)
-    const current = session.idx + 1;
-    const total = session.study.length;
-    document.getElementById('p-bar').style.width = `${(session.idx / total) * 100}%`;
-    document.getElementById('progress-text').innerText = `${current}/${total}`;
-
-    // 3. Reset trạng thái giao diện
+    // Reset giao diện
     document.getElementById('next-btn').style.display = 'none';
     const inputEl = document.getElementById('type-in');
     inputEl.value = '';
     inputEl.disabled = false;
-    inputEl.style.color = 'white'; 
-
-    // 4. Lấy từ hiện tại
-    session.correct = session.study[session.idx];
+    inputEl.style.color = 'white';
+    inputEl.classList.remove('shake');
     
-    // Hiển thị nghĩa và thêm nút Loa để nghe phát âm
-    document.getElementById('q-text').innerHTML = `
-        ${session.correct.m} 
-        <button onclick="speak('${session.correct.w}')" style="background:none; border:none; cursor:pointer; vertical-align:middle; margin-left:10px;">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="#38bdf8"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
-        </button>
-    `;
+    // Xóa thông báo đáp án cũ nếu có
+    const oldHint = document.querySelector('.hint-text');
+    if(oldHint) oldHint.remove();
 
-    // 5. Chế độ: Cứ 2 câu Trắc nghiệm thì có 1 câu Tự luận
-    const isTyping = (session.idx > 0 && (session.idx + 1) % 2 === 0);
-    document.getElementById('quiz-mode-badge').innerText = isTyping ? "TỰ LUẬN" : "TRẮC NGHIỆM";
-
+    // CHẾ ĐỘ ÔN TẬP: Cứ mỗi 2 câu trắc nghiệm sẽ xen kẽ 1 câu tự luận từ kho "đã đúng"
+    const isTyping = (correctPool.length > 0 && (session.idx + 1) % 3 === 0);
+    
     if(isTyping) {
+        session.correct = correctPool.shift(); // Lấy từ đã đúng trắc nghiệm ra để bắt gõ lại
+        document.getElementById('quiz-mode-badge').innerText = "ÔN TẬP TỰ LUẬN";
+        document.getElementById('q-text').innerHTML = `${session.correct.m}`; // Tự luận: KHÔNG hiện loa
         document.getElementById('q-options').style.display = 'none';
         document.getElementById('q-type-area').style.display = 'block';
-        setTimeout(() => inputEl.focus(), 200); 
+        setTimeout(() => inputEl.focus(), 200);
     } else {
+        session.correct = session.study[session.idx];
+        document.getElementById('quiz-mode-badge').innerText = "TRẮC NGHIỆM";
+        document.getElementById('q-text').innerHTML = `
+            ${session.correct.m} 
+            <button onclick="speak('${session.correct.w}')" style="background:none; border:none; cursor:pointer; vertical-align:middle; margin-left:10px;">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="#38bdf8"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+            </button>
+        `;
         document.getElementById('q-options').style.display = 'grid';
         document.getElementById('q-type-area').style.display = 'none';
         renderOptions();
     }
+
+    const current = session.idx + 1;
+    document.getElementById('p-bar').style.width = `${(session.idx / session.study.length) * 100}%`;
+    document.getElementById('progress-text').innerText = `${current}/${session.study.length}`;
 }
-function speak(text) {
-    if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel(); // Dừng câu đang nói cũ
-        const msg = new SpeechSynthesisUtterance(text);
-        msg.lang = 'en-UK';
-        msg.rate = 0.9;
-        window.speechSynthesis.speak(msg);
-    }
-}
+
+// 2. Hàm hiển thị đáp án trắc nghiệm
 function renderOptions() {
     const box = document.getElementById('q-options');
     box.innerHTML = '';
-    
-    // Lấy danh sách tất cả các từ trong database để làm đáp án nhiễu
     let allWords = db.flatMap(g => g.words).map(w => w.w);
-    // Lọc bỏ từ đúng hiện tại và lấy ngẫu nhiên 3 từ khác
     let opposites = shuffle([...new Set(allWords.filter(w => w !== session.correct.w))]).slice(0, 3);
-    // Trộn từ đúng với 3 từ nhiễu
     const choices = shuffle([session.correct.w, ...opposites]);
 
     choices.forEach(opt => {
@@ -478,39 +567,52 @@ function renderOptions() {
             document.querySelectorAll('.option-card').forEach(b => b.disabled = true);
             if(opt === session.correct.w) {
                 btn.classList.add('correct');
+                correctPool.push(session.correct); 
             } else {
                 btn.classList.add('wrong');
-                // NẾU SAI: Đẩy từ này xuống cuối danh sách để gặp lại sau
-                session.study.push(session.correct);
-                
+                let retryIdx = session.idx + 6; 
+                session.study.splice(retryIdx, 0, session.correct);
                 document.querySelectorAll('.option-card').forEach(b => { 
                     if(b.innerText === session.correct.w) b.classList.add('correct'); 
                 });
             }
-            session.idx++; 
+            session.idx++; // Tăng vị trí
+            saveUserProgress(); // LƯU TIẾN ĐỘ NGAY TẠI ĐÂY
+            document.getElementById('next-btn').innerText = "TIẾP THEO ➜";
             document.getElementById('next-btn').style.display = 'block';
         };
         box.appendChild(btn);
     });
 }
-
-// 2. Hàm kiểm tra đáp án tự luận (ĐÂY LÀ PHẦN BẠN ĐANG THIẾU)
 function checkTypeAnswer() {
     const inputEl = document.getElementById('type-in');
     const val = inputEl.value.trim().toLowerCase();
     const ans = session.correct.w.toLowerCase();
+    const area = document.getElementById('q-type-area');
+    const nextBtn = document.getElementById('next-btn');
     
-    inputEl.disabled = true;
+    inputEl.disabled = true; 
+    nextBtn.style.display = 'block';
+    nextBtn.innerText = "TIẾP THEO ➜";
+
     if(val === ans) {
         inputEl.style.color = 'var(--secondary)';
     } else {
+        inputEl.classList.add('shake');
         inputEl.style.color = 'var(--wrong)';
-        inputEl.value = ans; 
-        // Đẩy từ sai xuống cuối để học lại ngay trong phiên này
-        session.study.push(session.correct); 
+        
+        if(!document.querySelector('.hint-text')) {
+            const hint = document.createElement('div');
+            hint.className = 'hint-text';
+            hint.innerText = `Đáp án đúng là: ${ans}`;
+            area.appendChild(hint);
+        }
+        
+        let retryIdx = session.idx + 6;
+        session.study.splice(retryIdx, 0, session.correct);
     }
-    session.idx++; 
-    document.getElementById('next-btn').style.display = 'block';
+    session.idx++; // Tăng vị trí
+    saveUserProgress(); // LƯU TIẾN ĐỘ NGAY TẠI ĐÂY
 }
         window.onload = () => {
             resetManualRows();
