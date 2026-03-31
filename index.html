@@ -195,6 +195,8 @@
         }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     </style>
 </head>
 <body>
@@ -288,6 +290,22 @@
     </div>
 
     <script>
+// Cấu hình Firebase từ ảnh của bạn
+const firebaseConfig = {
+    apiKey: "AIzaSyALi34WevE0G9d5FxlMDi13kVdQ7RxYJV8",
+    authDomain: "myvocabapp-650b2.firebaseapp.com",
+    databaseURL: "https://myvocabapp-650b2-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "myvocabapp-650b2",
+    storageBucket: "myvocabapp-650b2.firebasestorage.app",
+    messagingSenderId: "1064308414191",
+    appId: "1:1064308414191:web:3465e95f26ace452102d1a",
+    measurementId: "G-CL1C3DEN06"
+};
+
+// Khởi tạo Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+const vocabRef = database.ref('vocab_data'); // Đường dẫn lưu dữ liệu trên Firebase
     const STORAGE_KEY = 'VOCAB_MASTER_PREMIUM_V7';
     let db = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
     let session = { study: [], correct: null, idx: 0, mode: 'bulk', editIndex: null };
@@ -386,7 +404,8 @@
     function deleteGroup(i) { 
         if(confirm("Xác nhận xóa bộ từ này?")) { 
             db.splice(i, 1); 
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); 
+// Đẩy dữ liệu lên Firebase thay vì chỉ lưu máy cục bộ
+vocabRef.set(db);
             renderDashboard(); 
         }
     }
@@ -529,10 +548,18 @@ function nextStep() {
         session.idx++; document.getElementById('next-btn').style.display = 'block';
     }
 
-    window.onload = () => {
-        resetManualRows();
-        renderDashboard();
-    };
+window.onload = () => {
+    resetManualRows();
+    
+    // Lắng nghe dữ liệu thay đổi từ Firebase Realtime
+    vocabRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            db = data; // Cập nhật biến db toàn cục bằng dữ liệu từ Firebase
+            renderDashboard(); // Vẽ lại giao diện
+        }
+    });
+};
 </script>
 </body>
 </html>
