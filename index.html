@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anh Đăng Đẳng Cấp Quá - Giao diện hiện đại</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { 
+            --bg-body: #0f172a;        /* Xanh đen sâu sắc */
+            --bg-surface: #1e293b;     /* Slate hiện đại */
+            --primary: #38bdf8;        /* Sky Blue chuyên nghiệp */
+            --primary-hover: #0ea5e9;
+            --secondary: #10b981;      /* Emerald tinh tế */
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --correct: #10b981;
+            --wrong: #f43f5e;
+            --accent: #f59e0b;
+            --card-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+            --glass: rgba(30, 41, 59, 0.7);
+        }
+
+        * { box-sizing: border-box; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: radial-gradient(circle at top left, #1e293b, #0f172a);
+            color: var(--text-main); margin: 0; padding: 0; 
+            min-height: 100vh; line-height: 1.6;
+        }
+
+        .container { max-width: 1000px; margin: 0 auto; padding: 60px 20px; }
+        
+        .page { display: none; animation: pageEnter 0.5s ease; }
+        .page.active { display: block; }
+        @keyframes pageEnter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Typography */
+        h1, h2, h3 { letter-spacing: -0.025em; }
+        .logo { font-size: 1.8rem; font-weight: 800; color: white; margin: 0; }
+        .logo span { color: var(--primary); }
+
+        /* Layout Elements */
+        .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 50px; }
+        
+        .section-header { margin-bottom: 24px; display: flex; align-items: center; gap: 12px; }
+        .section-header h2 { font-size: 0.85rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.1em; margin: 0; }
+        .divider { flex-grow: 1; height: 1px; background: rgba(255,255,255,0.1); }
+
+        /* Card Design (Modernized Glassmorphism) */
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 28px; /* Tăng độ bo góc */
+            padding: 32px;
+            box-shadow: var(--card-shadow);
+        }
+
+        /* Inputs (Clean & Modern) */
+        input, textarea {
+            width: 100%; padding: 18px 24px; border-radius: 16px; 
+            border: 2px solid rgba(255,255,255,0.05);
+            background: rgba(15, 23, 42, 0.6); color: white; 
+            outline: none; font-size: 1rem; font-family: inherit;
+            transition: all 0.3s;
+        }
+        input:focus { border-color: var(--primary); background: rgba(15, 23, 42, 0.8); }
+
+        /* Buttons (Refined) */
+        .btn-base {
+            padding: 14px 28px; border-radius: 14px; border: none; font-weight: 700;
+            cursor: pointer; display: inline-flex; align-items: center; gap: 10px;
+            font-size: 0.95rem; text-decoration: none;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Tăng hiệu ứng pop */
+        }
+        .btn-primary { background: var(--primary); color: #0f172a; }
+        .btn-primary:hover { background: var(--primary-hover); transform: translateY(-3px) scale(1.02); box-shadow: 0 10px 20px rgba(56, 189, 248, 0.2); }
+        
+        .btn-outline { background: transparent; color: white; border: 1px solid rgba(255,255,255,0.2); }
+        .btn-outline:hover { background: rgba(255,255,255,0.05); border-color: white; transform: translateY(-1px); }
+
+        /* Dictionary Area */
+        .dict-result { margin-top: 30px; animation: fadeIn 0.4s ease; }
+        .word-title { font-size: 2.8rem; font-weight: 800; margin: 0; }
+        .ipa-tag { color: var(--primary); font-family: monospace; font-size: 1.2rem; background: rgba(56, 189, 248, 0.1); padding: 4px 12px; border-radius: 8px; display: inline-block; margin: 10px 0; }
+
+        /* Library Grid (Updated Card UI) */
+        .library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 24px; }
+        .folder-item { cursor: pointer; position: relative; overflow: hidden; padding: 24px !important; }
+        .folder-item:hover { border-color: var(--primary); transform: translateY(-10px); }
+        .folder-item h3 { margin: 0 0 12px 0; font-size: 1.35rem; }
+        
+        /* Cải tiến Badge "10 WORDS" */
+        .count-pill { 
+            font-size: 0.7rem; 
+            font-weight: 800;
+            background: rgba(56, 189, 248, 0.15); /* Màu nền primary mờ nhẹ */
+            padding: 5px 12px; 
+            border-radius: 20px; 
+            color: var(--primary); /* Màu chữ primary nổi bật */
+            letter-spacing: 0.05em;
+        }
+        
+        /* Cải tiến Dòng tập ngay thành nút */
+        .btn-start-now {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            margin-top: auto;
+            transition: all 0.3s;
+        }
+        .folder-item:hover .btn-start-now {
+            background: var(--primary);
+            color: #0f172a;
+            border-color: var(--primary);
+        }
+
+        /* Quiz UI */
+        .quiz-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 40px; }
+        .quiz-progress-outer { height: 8px; background: rgba(255,255,255,0.05); border-radius: 10px; flex-grow: 1; margin: 0 20px; overflow: hidden; }
+        .quiz-progress-inner { height: 100%; background: linear-gradient(90deg, var(--primary), var(--secondary)); width: 0%; transition: 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        
+        .question-card { text-align: center; padding: 60px 20px; }
+.question-text { 
+    font-size: 3.5rem; 
+    font-weight: 800; 
+    color: white; 
+    margin-bottom: 40px; 
+    white-space: pre-line; /* Thêm dòng này để hỗ trợ xuống dòng */
+}
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .option-card {
+            padding: 30px; border-radius: 20px; background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05); color: white; font-size: 1.2rem;
+            font-weight: 600; cursor: pointer; text-align: center;
+            transition: all 0.2s;
+        }
+        .option-card:hover:not(:disabled) { background: rgba(255,255,255,0.08); border-color: var(--primary); transform: scale(1.03) translateY(-3px); }
+        
+        .correct { background: var(--secondary) !important; color: white !important; border-color: var(--secondary) !important; box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3); }
+        .wrong { background: var(--wrong) !important; color: white !important; border-color: var(--wrong) !important; box-shadow: 0 5px 15px rgba(244, 63, 94, 0.3); }
+
+        /* Tab Switcher */
+        .tab-group { display: inline-flex; background: rgba(0,0,0,0.2); padding: 6px; border-radius: 14px; margin-bottom: 24px; }
+        .tab-btn { padding: 10px 24px; border-radius: 10px; border: none; background: transparent; color: var(--text-dim); cursor: pointer; font-weight: 600; font-size: 0.9rem; transition: all 0.3s; }
+        .tab-btn.active { background: var(--bg-surface); color: var(--primary); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        
+        /* Cải tiến Form thủ công: Grid Layout */
+        #single-rows-container { display: flex; flex-direction: column; gap: 12px; }
+        .manual-input-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: center; margin-bottom: 8px; }
+        
+        /* Cải tiến Nút xóa dòng x */
+        .btn-remove-row {
+            background: rgba(244, 63, 94, 0.1); 
+            border: none; 
+            color: var(--wrong); 
+            cursor: pointer; 
+            font-weight: 800; 
+            width: 36px; 
+            height: 36px; 
+            border-radius: 10px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .btn-remove-row:hover {
+            background: var(--wrong);
+            color: white;
+            transform: scale(1.05);
+        }
+        
+        /* Cải tiến Nút Thêm dòng mới nét đứt */
+        .btn-add-row-dashed {
+            width:100%; 
+            margin-top:15px;
+            border-style: dashed; 
+            border-width: 2px;
+            background: rgba(255, 255, 255, 0.01);
+            color: var(--text-dim);
+        }
+        .btn-add-row-dashed:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(56, 189, 248, 0.03);
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        
+        <div id="page-home" class="page active">
+            <div class="top-nav">
+                <h1 class="logo">Anh Đăng<span>Đẹp Trai</span></h1>
+                <button class="btn-base btn-primary" onclick="session.editIndex = null; document.getElementById('new-group-name').value = ''; document.querySelector('#page-add .btn-primary').innerText = 'HOÀN TẤT & LƯU VÀO THƯ VIỆN'; resetManualRows(); switchPage('page-add')">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    TẠO NHÓM TỪ
+                </button>
+            </div>
+
+            <div class="section-header">
+                <h2>Tra cứu & Khám phá</h2>
+                <div class="divider"></div>
+            </div>
+            
+            <div class="glass-card" style="margin-bottom: 60px; padding: 24px;">
+                <div style="position: relative;">
+                    <input type="text" id="search-input" placeholder="Gõ từ tiếng Anh (VD: Serendipity)..." onkeypress="if(event.key === 'Enter') searchWord()">
+                    <div style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); color: var(--text-dim); font-size: 0.75rem; background: rgba(0,0,0,0.2); padding: 4px 10px; border-radius: 6px;">NHẤN ENTER</div>
+                </div>
+                <div id="dict-result" class="dict-result" style="display:none;"></div>
+            </div>
+
+            <div class="section-header">
+                <h2>Thư viện cá nhân</h2>
+                <div class="divider"></div>
+            </div>
+            <div id="folder-list" class="library-grid"></div>
+        </div>
+
+        <div id="page-add" class="page">
+            <div class="top-nav">
+                <button class="btn-base btn-outline" onclick="switchPage('page-home')">← QUAY LẠI</button>
+                <h2 style="margin:0; font-size: 1.5rem;">Thiết lập bộ từ mới</h2>
+            </div>
+            
+            <div class="glass-card">
+                <label style="display:block; margin-bottom:12px; font-weight:700; font-size:0.9rem; color:var(--primary); letter-spacing: 0.05em;">TÊN BỘ SƯU TẬP</label>
+                <input type="text" id="new-group-name" placeholder="Ví dụ: Oxford 3000 Core..." style="margin-bottom: 30px;">
+                
+                <div class="tab-group">
+                    <button class="tab-btn active" id="t-bulk" onclick="toggleInput('bulk')">Nhập nhanh (Text)</button>
+                    <button class="tab-btn" id="t-single" onclick="toggleInput('single')">Nhập thủ công (Form)</button>
+                </div>
+
+                <div id="input-bulk">
+                    <textarea id="bulk-text" placeholder="Định dạng: Từ tiếng Anh : Nghĩa tiếng Việt (Mỗi dòng 1 từ)&#10;Ví dụ: Diligent : Cần cù, siêng năng" style="height: 200px; line-height: 1.8;"></textarea>
+                </div>
+
+                <div id="input-single" style="display: none;">
+                    <div id="single-rows-container">
+                        </div>
+                    <button class="btn-base btn-outline btn-add-row-dashed" onclick="addInputRow()">+ THÊM DÒNG MỚI</button>
+                </div>
+
+                <button class="btn-base btn-primary" style="width: 100%; margin-top: 40px; justify-content: center; padding: 18px;" onclick="saveCollection()">
+                    HOÀN TẤT & LƯU VÀO THƯ VIỆN
+                </button>
+            </div>
+        </div>
+
+        <div id="page-quiz" class="page">
+            <div class="quiz-header">
+                <button class="btn-base btn-outline" onclick="switchPage('page-home')" style="padding: 10px 16px;">✕ THOÁT</button>
+                <div class="quiz-progress-outer"><div id="p-bar" class="quiz-progress-inner"></div></div>
+                <div id="quiz-mode-badge" style="background: var(--primary); color:#0f172a; padding:6px 14px; border-radius:10px; font-weight:800; font-size:0.75rem;"></div>
+            </div>
+
+            <div class="glass-card question-card">
+                <p style="color:var(--text-dim); font-weight:700; letter-spacing:3px; font-size:0.8rem; text-transform:uppercase;">ĐỊNH NGHĨA</p>
+                <div id="q-text" class="question-text"></div>
+                
+                <div id="q-options" class="options-grid"></div>
+
+                <div id="q-type-area" style="display:none; max-width:500px; margin: 0 auto;">
+                    <input type="text" id="type-in" style="font-size:2.8rem; text-align:center; border:none; border-bottom:3px solid var(--primary); background:transparent; border-radius:0; padding:10px;" placeholder="..." autocomplete="off">
+                    <button class="btn-base btn-primary" style="width:100%; margin-top:30px; justify-content:center;" onclick="checkTypeAnswer()">KIỂM TRA ĐÁP ÁN</button>
+                </div>
+                
+                <button id="next-btn" class="btn-base btn-primary" style="width:100%; display:none; margin-top:40px; justify-content:center; background:white; color:black;" onclick="nextStep()">
+                    TIẾP THEO ➜
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+    const STORAGE_KEY = 'VOCAB_MASTER_PREMIUM_V7';
+    let db = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    let session = { study: [], correct: null, idx: 0, mode: 'bulk', editIndex: null };
+
+    function shuffle(array) {
+        let arr = [...array];
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+
+    function switchPage(id) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(id === 'page-home') renderDashboard();
+    }
+
+    // --- DICTIONARY ENGINE ---
+// --- DICTIONARY ENGINE (ĐÃ FIX LỖI 1) ---
+    async function searchWord() {
+        const val = document.getElementById('search-input').value.trim();
+        const res = document.getElementById('dict-result');
+        if(!val) return;
+        
+        res.style.display = 'block';
+        res.innerHTML = '<p style="text-align:center; color:var(--text-dim);">Đang kết nối API từ điển...</p>';
+        
+        try {
+            const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${val}`);
+            const data = await response.json();
+            
+            // Kiểm tra nếu API báo không tìm thấy từ (data.title tồn tại) hoặc data không phải mảng
+            if(data.title || !Array.isArray(data)) {
+                res.innerHTML = `<p style="color:var(--wrong); text-align:center; padding: 20px;">Rất tiếc, không tìm thấy dữ liệu cho từ "<b>${val}</b>".</p>`;
+                return;
+            }
+            
+            const entry = data[0];
+            // Fix lỗi 1: Kiểm tra an toàn trước khi truy cập meanings và definitions
+            const meaning = entry.meanings && entry.meanings.length > 0 ? entry.meanings[0] : null;
+            const definition = (meaning && meaning.definitions && meaning.definitions.length > 0) 
+                               ? meaning.definitions[0].definition 
+                               : "Không có định nghĩa cụ thể.";
+            
+            const phonetics = entry.phonetics?.find(p => p.text)?.text || '/chưa cập nhật phiên âm/';
+
+            res.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div>
+                        <h2 class="word-title">${entry.word}</h2>
+                        <span class="ipa-tag">${phonetics}</span>
+                    </div>
+                    <a href="https://dictionary.cambridge.org/dictionary/english/${entry.word}" target="_blank" class="btn-base btn-outline" style="font-size:0.8rem; padding:8px 16px;">CAMBRIDGE ↗</a>
+                </div>
+                <div style="font-size:1.1rem; border-left: 4px solid var(--primary); padding:20px; margin-top:20px; background:rgba(0,0,0,0.15); border-radius: 12px;">
+                    <b style="color:var(--primary); text-transform:uppercase; font-size:0.8rem; font-weight:800;">${meaning ? meaning.partOfSpeech : 'Từ loại'}</b><br>
+                    ${definition}
+                </div>
+            `;
+        } catch(e) {
+            console.error(e);
+            res.innerHTML = `<p style="color:var(--wrong); text-align:center; padding: 20px;">Lỗi kết nối hoặc API bị gián đoạn. Vui lòng thử lại sau.</p>`;
+        }
+    }
+    // --- DASHBOARD ---
+    function renderDashboard() {
+        const list = document.getElementById('folder-list');
+        list.innerHTML = db.length ? '' : '<p style="color:var(--text-dim); grid-column:1/-1; text-align:center; padding: 40px; border: 2px dashed rgba(255,255,255,0.05); border-radius:20px;">Thư viện trống. Hãy tạo bộ từ đầu tiên của bạn!</p>';
+        
+        db.forEach((group, i) => {
+            const card = document.createElement('div');
+            card.className = 'glass-card folder-item';
+            card.onclick = () => { 
+                session.study = shuffle(group.words); 
+                session.idx = 0; 
+                switchPage('page-quiz'); 
+                nextStep(); 
+            };
+            card.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+                    <span class="count-pill">${group.words.length} WORDS</span>
+                    <div style="display:flex; gap:8px;">
+                        <button onclick="event.stopPropagation(); editGroup(${i})" style="background:rgba(56, 189, 248, 0.1); border:none; color:var(--primary); padding:6px 9px; border-radius:8px; cursor:pointer; font-size:0.75rem;">✎ Sửa</button>
+                        <button onclick="event.stopPropagation(); deleteGroup(${i})" style="background:rgba(244, 63, 94, 0.1); border:none; color:var(--wrong); padding:6px 9px; border-radius:8px; cursor:pointer; font-size:0.75rem;">🗑 Xóa</button>
+                    </div>
+                </div>
+                <h3>${group.name}</h3>
+                <div class="btn-start-now">Bấm để bắt đầu tập ngay ➜</div>
+            `;
+            list.appendChild(card);
+        });
+    }
+
+    function deleteGroup(i) { 
+        if(confirm("Xác nhận xóa bộ từ này?")) { 
+            db.splice(i, 1); 
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); 
+            renderDashboard(); 
+        }
+    }
+
+    function toggleInput(m) {
+        session.mode = m;
+        document.getElementById('input-bulk').style.display = m === 'bulk' ? 'block' : 'none';
+        document.getElementById('input-single').style.display = m === 'single' ? 'block' : 'none';
+        document.getElementById('t-bulk').classList.toggle('active', m === 'bulk');
+        document.getElementById('t-single').classList.toggle('active', m === 'single');
+        if (m === 'single' && document.getElementById('single-rows-container').children.length === 0) {
+            for(let i=0; i<3; i++) addInputRow();
+        }
+    }
+
+    function addInputRow(wVal = '', mVal = '') {
+        const div = document.createElement('div');
+        div.className = 'manual-input-row';
+        div.innerHTML = `
+            <input type="text" placeholder="Từ tiếng Anh..." class="w-val" value="${wVal}">
+            <input type="text" placeholder="Nghĩa..." class="m-val" value="${mVal}">
+            <button class="btn-remove-row" onclick="this.parentElement.remove()">✕</button>
+        `;
+        document.getElementById('single-rows-container').appendChild(div);
+    }
+    
+    function resetManualRows() {
+        document.getElementById('single-rows-container').innerHTML = '';
+        for(let i=0; i<3; i++) addInputRow();
+    }
+
+    function editGroup(index) {
+        const group = db[index];
+        session.editIndex = index;
+        document.getElementById('new-group-name').value = group.name;
+        toggleInput('single');
+        const container = document.getElementById('single-rows-container');
+        container.innerHTML = '';
+        group.words.forEach(word => addInputRow(word.w, word.m));
+        switchPage('page-add');
+        document.querySelector('#page-add .btn-primary').innerText = "CẬP NHẬT BỘ SƯU TẬP";
+    }
+function saveCollection() {
+    const name = document.getElementById('new-group-name').value.trim();
+    if(!name) return alert("Vui lòng nhập tên bộ từ!");
+    
+    let words = [];
+
+    // 1. Lấy dữ liệu từ Nhập nhanh (Bulk)
+    const bulkText = document.getElementById('bulk-text').value.trim();
+    if (bulkText !== "") {
+        bulkText.split('\n').forEach(line => {
+            if(line.includes(':')) {
+                const parts = line.split(':');
+                const w = parts[0].trim();
+                let m = parts.slice(1).join(':').trim();
+                // Tự động chuyển dấu / hoặc , thành dấu xuống dòng
+                m = m.replace(/[/,]/g, '\n'); 
+                if(w && m) words.push({w, m});
+            }
+        });
+    }
+
+    // 2. Lấy dữ liệu từ Nhập thủ công (Single)
+    document.querySelectorAll('.manual-input-row').forEach(row => {
+        const w = row.querySelector('.w-val')?.value.trim();
+        let m = row.querySelector('.m-val')?.value.trim();
+        if(w && m) {
+            // Tự động chuyển dấu / hoặc , thành dấu xuống dòng
+            m = m.replace(/[/,]/g, '\n');
+            words.push({w, m});
+        }
+    });
+
+    if(words.length < 2) return alert("Cần ít nhất 2 từ để học!");
+
+    if(session.editIndex !== null) {
+        db[session.editIndex] = {name, words};
+        session.editIndex = null;
+    } else {
+        db.push({name, words});
+    }
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+    switchPage('page-home');
+    document.getElementById('new-group-name').value = '';
+    document.getElementById('bulk-text').value = '';
+    resetManualRows();
+}
+function nextStep() {
+    document.getElementById('next-btn').style.display = 'none';
+    document.getElementById('type-in').value = '';
+    document.getElementById('type-in').disabled = false;
+    document.getElementById('p-bar').style.width = `${((session.idx % 10)/10)*100}%`;
+
+    if(session.study.length === 0) return;
+
+    session.correct = session.study[Math.floor(Math.random() * session.study.length)];
+    document.getElementById('q-text').innerText = session.correct.m;
+    
+    const isTyping = (session.idx > 0 && (session.idx + 1) % 6 === 0);
+    document.getElementById('quiz-mode-badge').innerText = isTyping ? "TỰ LUẬN" : "TRẮC NGHIỆM";
+
+    if(isTyping) {
+        document.getElementById('q-options').style.display = 'none';
+        document.getElementById('q-type-area').style.display = 'block';
+        document.getElementById('type-in').focus();
+    } else {
+        document.getElementById('q-options').style.display = 'grid';
+        document.getElementById('q-type-area').style.display = 'none';
+        let options = [session.correct.w];
+        let pool = session.study.filter(x => x.w !== session.correct.w).sort(() => Math.random() - 0.5);
+        for(let i=0; i<Math.min(3, pool.length); i++) options.push(pool[i].w);
+        options.sort(() => Math.random() - 0.5);
+        const box = document.getElementById('q-options'); 
+        box.innerHTML = '';
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'option-card'; btn.innerText = opt;
+            btn.onclick = () => {
+                document.querySelectorAll('.option-card').forEach(b => b.disabled = true);
+                if(opt === session.correct.w) btn.classList.add('correct');
+                else {
+                    btn.classList.add('wrong');
+                    document.querySelectorAll('.option-card').forEach(b => { 
+                        if(b.innerText === session.correct.w) b.classList.add('correct'); 
+                    });
+                }
+                session.idx++; document.getElementById('next-btn').style.display = 'block';
+            };
+            box.appendChild(btn);
+        });
+    }
+}    function checkTypeAnswer() {
+        const val = document.getElementById('type-in').value.trim().toLowerCase();
+        const ans = session.correct.w.toLowerCase();
+        document.getElementById('type-in').disabled = true;
+        if(val === ans) document.getElementById('type-in').style.color = 'var(--correct)';
+        else { document.getElementById('type-in').style.color = 'var(--wrong)'; document.getElementById('type-in').value = session.correct.w; }
+        session.idx++; document.getElementById('next-btn').style.display = 'block';
+    }
+
+    window.onload = () => {
+        resetManualRows();
+        renderDashboard();
+    };
+</script>
+</body>
+</html>
