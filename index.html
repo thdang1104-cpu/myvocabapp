@@ -204,17 +204,21 @@
         <div id="dict-result" class="dict-res" style="display:none; margin-top: 20px;"></div>
     </div>
 
-    <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-top: 40px;">
-        <div>
-            <h2 style="font-size: 1.6rem;">Thư viện cá nhân</h2>
-            <p style="color: var(--text-dim); font-size: 0.85rem;">Các bộ từ bạn đã tạo</p>
-        </div>
-        
-        <input type="text" id="search-folder" placeholder="Tìm tên bộ từ..." oninput="renderDashboard()" 
-               style="max-width: 250px; padding: 10px 15px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white;">
-        
-        <button class="btn-base btn-primary" onclick="switchPage('page-add')" style="padding: 10px 20px;">+ TẠO NHÓM MỚI</button>
+<div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-top: 40px;">
+    <div>
+        <h2 style="font-size: 1.6rem; margin-bottom: 5px;">Thư viện cá nhân</h2>
+        <p style="color: var(--text-dim); font-size: 0.85rem; margin-bottom: 8px;">Các bộ từ bạn đã tạo</p>
+        <p style="color: var(--primary); font-size: 0.8rem; font-weight: 600; display: flex; align-items: center; gap: 6px; opacity: 0.9;">
+            <span style="background: rgba(56, 189, 248, 0.15); padding: 2px 8px; border-radius: 6px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px;">Lưu ý</span> 
+            Hãy tạo nhóm mới khi muốn học
+        </p>
     </div>
+    
+    <input type="text" id="search-folder" placeholder="Tìm tên bộ từ..." oninput="renderDashboard()" 
+           style="max-width: 250px; padding: 10px 15px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white;">
+    
+    <button class="btn-base btn-primary" onclick="prepareAddPage()" style="padding: 10px 20px;">+ TẠO NHÓM MỚI</button>
+</div>
 
     <div id="folder-list" class="folder-grid" style="margin-top: 25px;">
         </div>
@@ -392,7 +396,6 @@ res.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center;">
         <div style="display:flex; align-items:center; gap:10px;">
             <h2 class="word-title" style="margin:0;">${entry.word}</h2>
-// Đảm bảo đoạn này có trong hàm searchWord
 <button onclick="speak('${entry.word}')" style="background:var(--primary); border:none; border-radius:50%; width:32px; height:32px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="black"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
 </button>
