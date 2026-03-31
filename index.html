@@ -392,6 +392,7 @@ res.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center;">
         <div style="display:flex; align-items:center; gap:10px;">
             <h2 class="word-title" style="margin:0;">${entry.word}</h2>
+// Đảm bảo đoạn này có trong hàm searchWord
 <button onclick="speak('${entry.word}')" style="background:var(--primary); border:none; border-radius:50%; width:32px; height:32px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="black"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
 </button>
@@ -594,23 +595,26 @@ function renderOptions() {
         btn.className = 'option-card';
         btn.innerText = opt;
         btn.onclick = () => {
-            document.querySelectorAll('.option-card').forEach(b => b.disabled = true);
-            if(opt === session.correct.w) {
-                btn.classList.add('correct');
-                correctPool.push(session.correct); 
-            } else {
-                btn.classList.add('wrong');
-                let retryIdx = session.idx + 6; 
-                session.study.splice(retryIdx, 0, session.correct);
-                document.querySelectorAll('.option-card').forEach(b => { 
-                    if(b.innerText === session.correct.w) b.classList.add('correct'); 
-                });
-            }
-            session.idx++; // Tăng vị trí
-            saveUserProgress(); // LƯU TIẾN ĐỘ NGAY TẠI ĐÂY
-            document.getElementById('next-btn').innerText = "TIẾP THEO ➜";
-            document.getElementById('next-btn').style.display = 'block';
-        };
+    document.querySelectorAll('.option-card').forEach(b => b.disabled = true);
+    if(opt === session.correct.w) {
+        btn.classList.add('correct');
+        correctPool.push(session.correct); 
+    } else {
+        btn.classList.add('wrong');
+        // SỬA TẠI ĐÂY: Tính toán vị trí chèn dựa trên câu hiện tại
+        let retryPosition = session.idx + 6; 
+        if (retryPosition > session.study.length) retryPosition = session.study.length;
+        session.study.splice(retryPosition, 0, session.correct);
+        
+        document.querySelectorAll('.option-card').forEach(b => { 
+            if(b.innerText === session.correct.w) b.classList.add('correct'); 
+        });
+    }
+    session.idx++; 
+    saveUserProgress(); 
+    document.getElementById('next-btn').innerText = "TIẾP THEO ➜";
+    document.getElementById('next-btn').style.display = 'block';
+};
         box.appendChild(btn);
     });
 }
@@ -638,11 +642,13 @@ function checkTypeAnswer() {
             area.appendChild(hint);
         }
         
-        let retryIdx = session.idx + 6;
-        session.study.splice(retryIdx, 0, session.correct);
+        // SỬA TẠI ĐÂY: Đảm bảo câu sai được chèn vào đúng vị trí tương lai
+        let retryPosition = session.idx + 6;
+        if (retryPosition > session.study.length) retryPosition = session.study.length;
+        session.study.splice(retryPosition, 0, session.correct);
     }
-    session.idx++; // Tăng vị trí
-    saveUserProgress(); // LƯU TIẾN ĐỘ NGAY TẠI ĐÂY
+    session.idx++; 
+    saveUserProgress(); 
 }
         window.onload = () => {
             resetManualRows();
