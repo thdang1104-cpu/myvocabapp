@@ -68,10 +68,20 @@
         /* --- PHẦN CSS: DÁN ĐÈ VÀO ĐOẠN CŨ --- */
 .manual-input-row { 
     display: grid; 
-    grid-template-columns: 1fr 1fr auto; 
-    gap: 12px; 
-    margin-bottom: 12px; 
-    align-items: center; /* Căn giữa tất cả thành phần theo chiều dọc */
+    grid-template-columns: 1fr 1.5fr auto; /* Cho ô nghĩa rộng hơn */
+    gap: 15px; 
+    margin-bottom: 15px; 
+    align-items: start; /* Căn lề trên để phù hợp với textarea */
+    background: rgba(255,255,255,0.02);
+    padding: 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+.manual-input-row textarea.m-val {
+    min-height: 45px;
+    height: 45px;
+    padding: 10px 15px;
+    resize: vertical; /* Cho phép người dùng kéo giãn chiều cao nếu cần */
 }
 
 .btn-remove-row { 
@@ -117,14 +127,14 @@
         /* Tìm và dán đè đoạn này vào CSS của bạn */
 /* 1. Cỡ chữ câu hỏi: nhỏ lại và cho phép xuống dòng */
 .question-text {
-    font-size: 2.2rem; 
-    font-weight: 800;
+    font-size: 2rem; 
+    font-weight: 700;
     color: white;
     margin-bottom: 30px;
-    white-space: pre-line; /* Quan trọng để hiện nhiều dòng */
+    white-space: pre-wrap; /* Quan trọng: Giữ nguyên các dấu xuống dòng */
+    word-wrap: break-word;
     line-height: 1.4;
     text-align: center;
-    min-height: 120px;
 }
 
 /* 2. Dấu X xóa dòng: Căn giữa tuyệt đối */
@@ -305,7 +315,20 @@
         let db = [];
         let session = { study: [], correct: null, idx: 0, currentFolderName: "" };
         let correctPool = []; // Chứa từ đúng trắc nghiệm để đợi ôn tập tự luận
+// --- CÁC HÀM HỖ TRỢ LƯU TỪ SAI VĨNH VIỄN ---
+function saveWrongWord(wordObj) {
+    if (session.currentFolderName) {
+        // Lưu vào nhánh riêng 'wrong_words' trên Firebase
+        database.ref(`wrong_words/${session.currentFolderName}/${wordObj.w}`).set(wordObj);
+    }
+}
 
+function removeWrongWord(wordW) {
+    if (session.currentFolderName) {
+        // Xóa khỏi danh sách sai khi người dùng đã trả lời đúng
+        database.ref(`wrong_words/${session.currentFolderName}/${wordW}`).remove();
+    }
+}
         // 1. Hàm phát âm (Chỉ dùng cho Trắc nghiệm/Từ điển)
         function speak(text) {
     if ('speechSynthesis' in window) {
@@ -343,25 +366,32 @@
         }
 // Hàm xóa tiến độ và bắt đầu lại
 function resetCurrentProgress() {
-    if (confirm("Bạn có chắc chắn muốn xóa tiến độ và bắt đầu lại bộ từ này không?")) {
-        // 1. Trộn lại danh sách câu hỏi để làm mới hoàn toàn
-        session.study = shuffle(session.study);
+    if (confirm("Bạn có chắc chắn muốn xóa tiến độ và bắt đầu lại bộ từ này không? (Bao gồm cả các từ đã sai trước đó)")) {
+        // 1. Trộn lại danh sách câu hỏi gốc từ database để làm mới
+        const originalGroup = db.find(g => g.name === session.currentFolderName);
+        if (originalGroup) {
+            session.study = shuffle([...originalGroup.words]);
+        }
         
         // 2. Đưa vị trí câu hỏi về ban đầu
         session.idx = 0;
         
-        // 3. Xóa danh sách câu hỏi ôn tập tự luận đang chờ
+        // 3. Xóa danh sách câu hỏi ôn tập tự luận đang chờ trong phiên này
         correctPool = [];
         
-        // 4. Xóa dữ liệu tiến trình trên Firebase
+        // 4. Xóa dữ liệu tiến trình VÀ danh sách từ sai trên Firebase
         if (session.currentFolderName) {
-            database.ref('user_progress/' + session.currentFolderName).remove()
+            const updates = {};
+            updates[`user_progress/${session.currentFolderName}`] = null;
+            updates[`wrong_words/${session.currentFolderName}`] = null;
+
+            database.ref().update(updates)
                 .then(() => {
-                    // 5. Nạp lại câu hỏi đầu tiên (lúc này đã được trộn mới)
+                    alert("Đã làm mới bộ từ hoàn toàn!");
                     nextStep();
                 })
                 .catch(err => {
-                    console.error("Lỗi khi xóa tiến trình:", err);
+                    console.error("Lỗi khi xóa dữ liệu:", err);
                     nextStep();
                 });
         }
@@ -461,18 +491,32 @@ function resetCurrentProgress() {
         const card = document.createElement('div');
         card.className = 'glass-card folder-item';
         card.onclick = async () => { 
-            session.study = [...group.words]; // Copy danh sách từ
-            session.currentFolderName = group.name;
-            
-            // Tải vị trí câu hỏi cũ
-            const savedIdx = await loadUserProgress(group.name);
-            
-            // Nếu đã học xong thì bắt đầu lại từ đầu, nếu chưa thì học tiếp
-            session.idx = (savedIdx < session.study.length) ? savedIdx : 0;
-            
-            switchPage('page-quiz'); 
-            nextStep(); 
-        };
+    session.currentFolderName = group.name;
+    
+    // 1. Lấy danh sách từ gốc
+    let baseWords = [...group.words]; 
+
+    // 2. Lấy danh sách từ đã từng sai từ Firebase
+    const wrongSnapshot = await database.ref(`wrong_words/${group.name}`).once('value');
+    const wrongData = wrongSnapshot.val();
+    
+    if (wrongData) {
+        const wrongWordsArray = Object.values(wrongData);
+        // Trộn các từ sai vào danh sách học (cho lên đầu hoặc trộn đều)
+        session.study = shuffle([...wrongWordsArray, ...baseWords]); 
+    } else {
+        session.study = baseWords;
+    }
+    
+    // 3. Tải vị trí câu hỏi cũ
+    const savedIdx = await loadUserProgress(group.name);
+    
+    // Reset về 0 nếu đã học xong, hoặc học tiếp từ vị trí cũ
+    session.idx = (savedIdx < session.study.length) ? savedIdx : 0;
+    
+    switchPage('page-quiz'); 
+    nextStep(); 
+};
         // Tìm trong hàm renderDashboard và thay thế đoạn tạo nội dung card:
 card.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -497,11 +541,16 @@ card.innerHTML = `
         }
 
         function addInputRow(w = '', m = '') {
-            const div = document.createElement('div');
-            div.className = 'manual-input-row';
-            div.innerHTML = `<input type="text" class="w-val" value="${w}" placeholder="Từ mới..."><input type="text" class="m-val" value="${m}" placeholder="Nghĩa..."><button class="btn-remove-row" onclick="this.parentElement.remove()">✕</button>`;
-            document.getElementById('single-rows-container').appendChild(div);
-        }
+    const div = document.createElement('div');
+    div.className = 'manual-input-row';
+    // Đổi ô m-val từ <input> sang <textarea>
+    div.innerHTML = `
+        <input type="text" class="w-val" value="${w}" placeholder="Từ mới">
+        <textarea class="m-val" placeholder="Nghĩa">${m}</textarea>
+        <button class="btn-remove-row" onclick="this.parentElement.remove()">✕</button>
+    `;
+    document.getElementById('single-rows-container').appendChild(div);
+}
 
         function resetManualRows() {
             document.getElementById('single-rows-container').innerHTML = '';
@@ -512,48 +561,50 @@ function saveCollection() {
     const name = document.getElementById('new-group-name').value.trim();
     if(!name) return alert("Vui lòng nhập tên bộ từ!");
     
-    let tempWords = [];
+    let rawWords = [];
 
-    // 1. Lấy từ Nhập nhanh
+    // Lấy từ Nhập nhanh
     const bulkText = document.getElementById('bulk-text').value.trim();
-    if (bulkText !== "") {
+    if (bulkText) {
         bulkText.split('\n').forEach(line => {
             if(line.includes(':')) {
-                const parts = line.split(':');
-                tempWords.push({ w: parts[0].trim(), m: parts[1].trim() });
+                const [w, m] = line.split(':');
+                rawWords.push({ w: w.trim(), m: m.trim() });
             }
         });
     }
 
-    // 2. Lấy từ Nhập thủ công
+    // Lấy từ Nhập thủ công (bao gồm cả textarea mới)
     document.querySelectorAll('.manual-input-row').forEach(row => {
         const w = row.querySelector('.w-val')?.value.trim();
         const m = row.querySelector('.m-val')?.value.trim();
-        if(w && m) tempWords.push({ w, m });
+        if(w && m) rawWords.push({ w, m });
     });
 
-    // 3. KHỬ TRÙNG LẶP: Đảm bảo không bị lặp lại dẫn đến con số 883
-    const uniqueWords = [];
-    const seen = new Set();
-    tempWords.forEach(item => {
-        const lowerW = item.w.toLowerCase();
-        if(!seen.has(lowerW)) {
-            seen.add(lowerW);
-            uniqueWords.push(item);
-        }
+    // KHỬ TRÙNG LẶP: Dựa trên từ (w) để không bị lặp từ trong cùng 1 bộ
+    const uniqueMap = new Map();
+    rawWords.forEach(item => {
+        uniqueMap.set(item.w.toLowerCase(), item);
     });
+    const finalWords = Array.from(uniqueMap.values());
 
-    if(uniqueWords.length < 2) return alert("Cần ít nhất 2 từ khác nhau!");
+    if(finalWords.length < 2) return alert("Cần ít nhất 2 từ khác nhau!");
 
-    if(session.editIndex !== null) db[session.editIndex] = { name, words: uniqueWords };
-    else db.push({ name, words: uniqueWords });
+    // Cập nhật vào mảng db cục bộ
+    if(session.editIndex !== null) {
+        db[session.editIndex] = { name, words: finalWords };
+    } else {
+        db.push({ name, words: finalWords });
+    }
 
+    // Đồng bộ lên Firebase
     vocabRef.set(db).then(() => {
+        alert("Đã lưu thành công!");
         switchPage('page-home');
         document.getElementById('new-group-name').value = '';
         document.getElementById('bulk-text').value = '';
         resetManualRows();
-    });
+    }).catch(err => alert("Lỗi lưu dữ liệu: " + err.message));
 }
         function editGroup(i) {
             session.editIndex = i;
@@ -636,20 +687,23 @@ function renderOptions() {
     if(opt === session.correct.w) {
         btn.classList.add('correct');
         correctPool.push(session.correct); 
+        
+        // MỚI: Trả lời đúng thì xóa khỏi danh sách từ sai trên Firebase
+        removeWrongWord(session.correct.w);
     } else {
         btn.classList.add('wrong');
-        // SỬA TẠI ĐÂY: Tính toán vị trí chèn dựa trên câu hiện tại
-        let retryPosition = session.idx + 6; 
-        if (retryPosition > session.study.length) retryPosition = session.study.length;
-        session.study.splice(retryPosition, 0, session.correct);
+        let retryPos = Math.min(session.idx + 7, session.study.length);
+        session.study.splice(retryPos, 0, session.correct);
         
+        // MỚI: Trả lời sai thì lưu vào Firebase để lần sau học lại tiếp
+        saveWrongWord(session.correct);
+
         document.querySelectorAll('.option-card').forEach(b => { 
             if(b.innerText === session.correct.w) b.classList.add('correct'); 
         });
     }
     session.idx++; 
     saveUserProgress(); 
-    document.getElementById('next-btn').innerText = "TIẾP THEO ➜";
     document.getElementById('next-btn').style.display = 'block';
 };
         box.appendChild(btn);
@@ -659,30 +713,29 @@ function checkTypeAnswer() {
     const inputEl = document.getElementById('type-in');
     const val = inputEl.value.trim().toLowerCase();
     const ans = session.correct.w.toLowerCase();
-    const area = document.getElementById('q-type-area');
     const nextBtn = document.getElementById('next-btn');
     
     inputEl.disabled = true; 
     nextBtn.style.display = 'block';
-    nextBtn.innerText = "TIẾP THEO ➜";
 
     if(val === ans) {
         inputEl.style.color = 'var(--secondary)';
+        // MỚI: Đúng thì xóa "nợ" từ sai
+        removeWrongWord(session.correct.w);
     } else {
         inputEl.classList.add('shake');
         inputEl.style.color = 'var(--wrong)';
-        
         if(!document.querySelector('.hint-text')) {
             const hint = document.createElement('div');
             hint.className = 'hint-text';
             hint.innerText = `Đáp án đúng là: ${ans}`;
-            area.appendChild(hint);
+            document.getElementById('q-type-area').appendChild(hint);
         }
+        let retryPos = Math.min(session.idx + 7, session.study.length);
+        session.study.splice(retryPos, 0, session.correct);
         
-        // SỬA TẠI ĐÂY: Đảm bảo câu sai được chèn vào đúng vị trí tương lai
-        let retryPosition = session.idx + 6;
-        if (retryPosition > session.study.length) retryPosition = session.study.length;
-        session.study.splice(retryPosition, 0, session.correct);
+        // MỚI: Sai thì ghi chú lại để lần sau vào app vẫn thấy từ này
+        saveWrongWord(session.correct);
     }
     session.idx++; 
     saveUserProgress(); 
