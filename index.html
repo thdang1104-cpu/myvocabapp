@@ -316,18 +316,59 @@
         let session = { study: [], correct: null, idx: 0, currentFolderName: "" };
         let correctPool = []; // Chứa từ đúng trắc nghiệm để đợi ôn tập tự luận
 // --- CÁC HÀM HỖ TRỢ LƯU TỪ SAI VĨNH VIỄN ---
+// --- CÁC HÀM HỖ TRỢ LƯU TỪ SAI VÀ TỪ ĐÃ THUỘC ---
 function saveWrongWord(wordObj) {
     if (session.currentFolderName) {
-        // Lưu vào nhánh riêng 'wrong_words' trên Firebase
         database.ref(`wrong_words/${session.currentFolderName}/${wordObj.w}`).set(wordObj);
     }
 }
 
 function removeWrongWord(wordW) {
     if (session.currentFolderName) {
-        // Xóa khỏi danh sách sai khi người dùng đã trả lời đúng
         database.ref(`wrong_words/${session.currentFolderName}/${wordW}`).remove();
     }
+}
+
+// MỚI: Lưu từ đã thuộc để không xuất hiện lại
+function saveMasteredWord(wordW) {
+    if (session.currentFolderName) {
+        database.ref(`mastered_words/${session.currentFolderName}/${wordW}`).set(true);
+    }
+}
+
+function removeMasteredWord(wordW) {
+    if (session.currentFolderName) {
+        database.ref(`mastered_words/${session.currentFolderName}/${wordW}`).remove();
+    }
+}
+
+// MỚI: Thuật toán tính độ chênh lệch ký tự (Levenshtein)
+function getEditDistance(a, b) {
+    if(a.length === 0) return b.length;
+    if(b.length === 0) return a.length;
+    let matrix = [];
+    for(let i = 0; i <= b.length; i++){ matrix[i] = [i]; }
+    for(let j = 0; j <= a.length; j++){ matrix[0][j] = j; }
+    for(let i = 1; i <= b.length; i++){
+        for(let j = 1; j <= a.length; j++){
+            if(b.charAt(i-1) === a.charAt(j-1)){
+                matrix[i][j] = matrix[i-1][j-1];
+            } else {
+                matrix[i][j] = Math.min(matrix[i-1][j-1] + 1, Math.min(matrix[i][j-1] + 1, matrix[i-1][j] + 1));
+            }
+        }
+    }
+    return matrix[b.length][a.length];
+}
+
+// MỚI: Kiểm tra xem có "gần đúng" không
+function isCloseEnough(val, ans) {
+    if (val === ans) return true;
+    let distance = getEditDistance(val, ans);
+    let maxLength = Math.max(val.length, ans.length);
+    // Cho phép sai: 0 lỗi (<5 ký tự), 1 lỗi (5-7 ký tự), 2 lỗi (>7 ký tự)
+    let allowedTypos = maxLength <= 4 ? 0 : (maxLength <= 7 ? 1 : 2); 
+    return distance <= allowedTypos;
 }
         // 1. Hàm phát âm (Chỉ dùng cho Trắc nghiệm/Từ điển)
         function speak(text) {
@@ -366,24 +407,20 @@ function removeWrongWord(wordW) {
         }
 // Hàm xóa tiến độ và bắt đầu lại
 function resetCurrentProgress() {
-    if (confirm("Bạn có chắc chắn muốn xóa tiến độ và bắt đầu lại bộ từ này không? (Bao gồm cả các từ đã sai trước đó)")) {
-        // 1. Trộn lại danh sách câu hỏi gốc từ database để làm mới
+    if (confirm("Bạn có chắc chắn muốn xóa tiến độ và bắt đầu lại bộ từ này không? (Bao gồm cả các từ đã sai và đã thuộc)")) {
         const originalGroup = db.find(g => g.name === session.currentFolderName);
         if (originalGroup) {
             session.study = shuffle([...originalGroup.words]);
         }
         
-        // 2. Đưa vị trí câu hỏi về ban đầu
         session.idx = 0;
-        
-        // 3. Xóa danh sách câu hỏi ôn tập tự luận đang chờ trong phiên này
         correctPool = [];
         
-        // 4. Xóa dữ liệu tiến trình VÀ danh sách từ sai trên Firebase
         if (session.currentFolderName) {
             const updates = {};
             updates[`user_progress/${session.currentFolderName}`] = null;
             updates[`wrong_words/${session.currentFolderName}`] = null;
+            updates[`mastered_words/${session.currentFolderName}`] = null; // Xóa danh sách đã thuộc
 
             database.ref().update(updates)
                 .then(() => {
@@ -396,8 +433,7 @@ function resetCurrentProgress() {
                 });
         }
     }
-}
-        // 4. Hàm tải tiến trình từ Firebase
+}        // 4. Hàm tải tiến trình từ Firebase
         async function loadUserProgress(folderName) {
             try {
                 const snapshot = await database.ref('user_progress/' + folderName).once('value');
@@ -491,32 +527,46 @@ function resetCurrentProgress() {
         const card = document.createElement('div');
         card.className = 'glass-card folder-item';
         card.onclick = async () => { 
-    session.currentFolderName = group.name;
-    
-    // 1. Lấy danh sách từ gốc
-    let baseWords = [...group.words]; 
+            session.currentFolderName = group.name;
+            
+            // 1. Lấy danh sách từ gốc
+            let baseWords = [...group.words]; 
 
-    // 2. Lấy danh sách từ đã từng sai từ Firebase
-    const wrongSnapshot = await database.ref(`wrong_words/${group.name}`).once('value');
-    const wrongData = wrongSnapshot.val();
-    
-    if (wrongData) {
-        const wrongWordsArray = Object.values(wrongData);
-        // Trộn các từ sai vào danh sách học (cho lên đầu hoặc trộn đều)
-        session.study = shuffle([...wrongWordsArray, ...baseWords]); 
-    } else {
-        session.study = baseWords;
-    }
-    
-    // 3. Tải vị trí câu hỏi cũ
-    const savedIdx = await loadUserProgress(group.name);
-    
-    // Reset về 0 nếu đã học xong, hoặc học tiếp từ vị trí cũ
-    session.idx = (savedIdx < session.study.length) ? savedIdx : 0;
-    
-    switchPage('page-quiz'); 
-    nextStep(); 
-};
+            // 2. Lấy dữ liệu từ Firebase
+            const wrongSnapshot = await database.ref(`wrong_words/${group.name}`).once('value');
+            const wrongData = wrongSnapshot.val();
+            
+            const masteredSnapshot = await database.ref(`mastered_words/${group.name}`).once('value');
+            const masteredData = masteredSnapshot.val();
+            const masteredWordsArray = masteredData ? Object.keys(masteredData) : [];
+
+            // 3. Lọc bỏ hoàn toàn những từ đã thuộc (đúng cả trắc nghiệm + tự luận)
+            baseWords = baseWords.filter(w => !masteredWordsArray.includes(w.w));
+
+            let finalStudyList = [];
+            if (wrongData) {
+                const wrongWordsArray = Object.values(wrongData);
+                const filteredWrong = wrongWordsArray.filter(w => !masteredWordsArray.includes(w.w));
+                
+                // Ý TƯỞNG: Những từ trong danh sách "Sai" (wrong_words) sẽ được ưu tiên
+                // xuất hiện dưới dạng Tự luận ngay hoặc trộn vào để học lại.
+                finalStudyList = shuffle([...filteredWrong, ...baseWords]); 
+            } else {
+                finalStudyList = shuffle(baseWords);
+            }
+            
+            if(finalStudyList.length === 0) {
+                alert("Chúc mừng! Bạn đã thuộc toàn bộ từ trong nhóm này.");
+                return;
+            }
+
+            session.study = finalStudyList;
+            session.idx = 0; 
+            correctPool = []; // Reset hàng chờ tự luận cho phiên mới
+            
+            switchPage('page-quiz'); 
+            nextStep(); 
+        };
         // Tìm trong hàm renderDashboard và thay thế đoạn tạo nội dung card:
 card.innerHTML = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -686,10 +736,10 @@ function renderOptions() {
     document.querySelectorAll('.option-card').forEach(b => b.disabled = true);
     if(opt === session.correct.w) {
         btn.classList.add('correct');
-        correctPool.push(session.correct); 
+        correctPool.push(session.correct); // Đưa vào hàng chờ để làm tự luận
         
-        // MỚI: Trả lời đúng thì xóa khỏi danh sách từ sai trên Firebase
         removeWrongWord(session.correct.w);
+        // Đã xóa saveMasteredWord ở đây để chỉ khi đúng tự luận mới coi là thuộc hẳn
     } else {
         btn.classList.add('wrong');
         let retryPos = Math.min(session.idx + 7, session.study.length);
@@ -718,10 +768,21 @@ function checkTypeAnswer() {
     inputEl.disabled = true; 
     nextBtn.style.display = 'block';
 
-    if(val === ans) {
+    // KIỂM TRA ĐÁP ÁN GẦN ĐÚNG
+    if(isCloseEnough(val, ans)) {
         inputEl.style.color = 'var(--secondary)';
-        // MỚI: Đúng thì xóa "nợ" từ sai
+        
+        // Nếu gần đúng nhưng có sai sót nhỏ, hiển thị từ chuẩn cho user biết
+        if(val !== ans && !document.querySelector('.hint-text')) {
+            const hint = document.createElement('div');
+            hint.className = 'hint-text';
+            hint.style.color = 'var(--secondary)'; // Hiện màu xanh báo hiệu được chấp nhận
+            hint.innerText = `Chấp nhận! Đáp án chuẩn: ${ans}`;
+            document.getElementById('q-type-area').appendChild(hint);
+        }
+        
         removeWrongWord(session.correct.w);
+        saveMasteredWord(session.correct.w); // Xác nhận đã thuộc hoàn toàn
     } else {
         inputEl.classList.add('shake');
         inputEl.style.color = 'var(--wrong)';
@@ -734,10 +795,11 @@ function checkTypeAnswer() {
         let retryPos = Math.min(session.idx + 7, session.study.length);
         session.study.splice(retryPos, 0, session.correct);
         
-        // MỚI: Sai thì ghi chú lại để lần sau vào app vẫn thấy từ này
         saveWrongWord(session.correct);
+        removeMasteredWord(session.correct.w); // Sai tự luận thì gỡ khỏi danh sách đã thuộc
     }
-    session.idx++; 
+    
+    // Đã xóa session.idx++ ở đây để khắc phục lỗi nhảy cóc câu hỏi trắc nghiệm
     saveUserProgress(); 
 }
         window.onload = () => {
